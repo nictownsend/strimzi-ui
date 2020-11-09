@@ -4,7 +4,7 @@ This documentation will cover both the [building of the UI client and server cod
 
 ## UI client and server build
 
-This UI codebase (client and server) is built using two tools, [Babel](https://babeljs.io/) and [Webpack](https://webpack.js.org/). Webpack acts as our main build and bundling tool, while Babel acts as a transpiler - meaning the UI codebase can make use of the latest and greatest ECMAscript syntax, and Babel will polyfill where appropriate to provide cross browser support. The below will detail choices we have made regarding how the build works, configuration and considerations to be aware of, and the end output. The aim of this stack is to have a fast and efficient build for day to day development, but also the smallest possible built bundles so users do not need to wait a long time for all required assets to be retrieved by their browser.
+This UI codebase (client and server) is built using two tools, [TypeScript](https://www.typescriptlang.org/) and [Webpack](https://webpack.js.org/). Webpack acts as our main build and bundling tool, while TypeScript acts as a transpiler - meaning the UI codebase can make use of the latest and greatest ECMAscript syntax, and TypeScript will polyfill where appropriate to provide cross browser support. The below will detail choices we have made regarding how the build works, configuration and considerations to be aware of, and the end output. The aim of this stack is to have a fast and efficient build for day to day development, but also the smallest possible built bundles so users do not need to wait a long time for all required assets to be retrieved by their browser.
 
 ### Treeshaking
 
@@ -17,64 +17,9 @@ To maintain a small built bundle size, we take advantage of [Webpack's treeshaki
 
 Webpack (and it's plugins) are highly customisable. This section will detail the choices we have made around how and what is built, where it is built to, and the roles and responsibilities of the various plugins which enable this.
 
-#### Webpack aliases
-
-The UI makes extensive use of Webpack's [alias](https://webpack.js.org/configuration/resolve/#resolvealias) features. This is done for two reasons:
-
-1. It allows for abstraction at build time. By importing view layers via an alias the resolution of that alias can be changed at build time, enabling the ability to swap view layer implementations without needing to make changes in the production code. For instance:
-
-- If a component has [multiple view layer implementations](./Architecture.md#swap-able-view-layers):
-
-```
-  ...
-  View.carbon.js
-  View.patternfly.js
-  ...
-```
-
-- And the component exports itself via the View alias:
-
-```
-export * from 'View'
-```
-
-- And the View alias is defined as follows:
-
-```
-...
-    View: `./View.${VL_SUFFIX}.js`
-...
-```
-
-where `VL_SUFFIX` is a suffix, in this case mapping to in this case either `carbon` or `patternfly`. At build time, one of the two layers is resolved, and thus available for use elsewhere.
-
-2. It makes importing code far cleaner and easier. For example, a traditional import of a module in another directory:
-
-```
-import { myFunction } from '../../Modules/MyModule';
-```
-
-with the following Webpack configuration:
-
-```
-...
-alias: {
-    MyModule: path.resolve(__dirname, 'Modules/MyModule')
-}
-...
-```
-
-becomes
-
-```
-import { myFunction } from 'MyModule'
-```
-
-For convenience, all top level module directories from `client` will be automatically aliased via a helper in the webpack configuration, as well defining dynamic view and styling aliases as described above, as well as an alias for model code.
-
 #### Webpack configuration and plugins
 
-In addition to aliasing, the webpack configuration will be as follows:
+The webpack configuration will be as follows:
 
 | Option                          | Value                                                                                                                                                                   |                                                                                                                                                                                                                                                        Purpose |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
@@ -82,7 +27,7 @@ In addition to aliasing, the webpack configuration will be as follows:
 | mode                            | `production` or `development` (provided via config file used)                                                                                                           |                                                                                                                                       Build mode. If production, code will be minified and have developer helpers (warnings etc) removed from the built output |
 | target                          | `web` or `node` (provided via config file used)                                                                                                                         |                                                                                The build target. The client side code will be built for `web`, and server `node`, reflecting where the code runs (and thus what Webpack will/will not include in it's output). |
 | output.path                     | `dist/client` or `dist/server` (via constant)                                                                                                                           |                                                                                                           All output to be placed in the `dist` directory, with client code going into the `client` directory, and all server code into `server` respectively. |
-| output.publicPath               | `` (empty string) | The public path of static/public content included by Webpack. Is relative to the URL.                                                               |
+| output.publicPath               | `` (empty string)                                                                                                                                                       |                                                                                                                                                                          The public path of static/public content included by Webpack. Is relative to the URL. |
 | output.filename                 | `[name].bundle.js`                                                                                                                                                      |                                                                                                                                                                 Name of the built entry bundle. Will be `main.bundle.js` once built as we have one entry point |
 | module.rules                    | Array of rules - [see here for details](#module-rules)                                                                                                                  |                                                                                                                                         Rules/tests to run on modules being built. Depending on the file being parsed, different transformations should be run |
 | plugins                         | Array of plugins - [see here for details](#webpack-plugins)                                                                                                             |                                                                                                                                                                                         Additional tools to customise the build to produce the required output |
@@ -102,7 +47,7 @@ Webpack allows file specific loaders or utilities to be invoked as a part of the
 | Rule                        | Plugin/loader(s)                                                                                        |                                                                                                                                                                                                   Purpose |
 | --------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
 | `/(\.css\|.scss)$/`         | `style-loader` (dev only), `miniCssExtractPlugin.loader` (production only), `css-loader`, `sass-loader` | Handle scss/css loading/references. If dev mode, use `style-loader` for speed, else use `miniCssExtractPlugin.loader` (in combination with the `miniCssExtractPlugin` plugin) to produce/emit css file(s) |
-| `/(\.js)$/`                 | `babel-loader`                                                                                          |                                                        Perform babel transpile on all JS files. This will be configured with presets for recent browsers, and enable caching to improve build performance |
+| `/(\.(t                     | j)sx?)\$/`                                                                                              |                                                                                                                                                                                               `ts-loader` | Perform ts compile on all JS/TS files. This will be configured with presets for recent browsers, and enable caching to improve build performance |
 | `/\.(woff(2)?\|ttf\|eot)$/` | `file-loader`                                                                                           |                 For any font file, use file-loader to package the font to the `output.path` and replace/update any imports of those fonts to this location. These will be directed to a 'fonts' directory |
 | `/\.(jpg\|gif\|png\|svg)$/` | `file-loader`                                                                                           |             For any image file, use file-loader to package the image to the `output.path` and replace/update any imports of those images to this location. These will be directed to a 'images' directory |
 
@@ -122,6 +67,8 @@ We also make use of the following plugins:
 | webpack-bundle-analyzer            | At build time, produce a report regarding the JS bundle size (useful for understanding bloat and duplication). At dev build time this is an html file (which is then hosted by `webpack-dev-server`), and a json file at production build time. Each report is written to the `generated/bundle-analyser` directory |
 | BannerPlugin                       |                                                                                                                                                                                                            Used to add a copyright header to built css code. Other types handled by other plugins (eg TerserPlugin) |
 | webpack-node-externals             |                                                                        Excludes any code from `node_modules`. Useful when building node.js bundles, due to OS/dynamic requirements of those modules. Expectation is these will be installed/provided at build time via an `npm install` alongside the built output. |
+| tsconfig-paths-webpack-plugin      |                                                                                                                                                                                                              Reads a specified `tsconfig.json` file, and generates Webpack aliases for any specified `path` values. |
+| NormalModuleReplacementPlugin      |                                                                                                                                                                                             Used to provide a swappable view layer - intercepts "import" statements and replaces with different location for module |
 
 Where appropriate, plugins will be provided via helper functions from a common configuration file, but allow for modification to their configuration. [See this section for more details](#ui-build-implementation).
 
@@ -136,6 +83,26 @@ These options will all be provided to the TerserPlugin via it's constructor.
 | terserOptions.keep_classnames | `true`                                  |                      Keep original class names |
 | terserOptions.keep_fnames     | `true`                                  |                   Keep original function names |
 | terserOptions.mangle.safari10 | `true`                                  |               Works around known Safari issues |
+
+##### Swappable view layers
+
+`NormalModuleReplacementPlugin` is used to support swapping between [multiple view layer implementations](./Architecture.md#swap-able-view-layers) at build time:
+
+```ts
+  ...
+  Component.carbon.ts
+  Component.patternfly.ts
+  Component.ts
+  ...
+```
+
+- And the component exports the carbon implementation:
+
+```ts
+export * from 'Component.carbon.ts';
+```
+
+By supplying the env var `VL=PATTERNFLY` before running a build - webpack will replace `carbon` with `patternfly` in the export statement.
 
 #### Webpack output
 
@@ -166,7 +133,7 @@ dist/
             ...
         ...
     server/
-        main.bundle.js
+        main.js
         ...
 ```
 
@@ -174,20 +141,84 @@ dist/
 
 To enable efficient development, this UI makes use of [webpack-dev-server](https://webpack.js.org/configuration/dev-server/). This re-uses the above Webpack configuration, but adds helpful developer features, such as file watching and hot reloading of changes. When run, all content is built and served from memory, with static assets such as images being served from the configured public path. Configuration of the dev server is in the `devServer` section of the `webpack.config.js` file, and a brief summary of each option can be found below:
 
-| Option           | Value                                                             |                                                                                                                                                                                                                                                                                                                            Reason |
-| ---------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| contentBase      | [`dist` (via constant), `generated/bundle-analyser/bundles.html`] | Source for static files. This is the built output directory, where static files will land as a part of the first build during dev start up. In addition, include the output of `webpack-bundle-analyzer`, so a developer can access a `/bundles.html` file through `webpack-dev-server`, showing current bundle size/distribution |
-| watchContentBase | `true`                                                            |                                                                                                                                                                                                                                                                                                   Reload if a static file changes |
-| compress         | `true`                                                            |                                                                                                                                                                                                                                                   Serve all content via .gz files - makes rebuilds/hot changes faster to retrieve |
-| inline           | `true`                                                            |                                                                                                                                                                                                                                                            Enforce default setting, recommended when using `hot` reloading option |
-| hot              | `true`                                                            |                                                                                                                                                                                                                                                                                Enables hot reloading of content when files change |
-| proxy            | TBD                                                               |                                                                                                                                                                                                                                                                    Used to proxy requests for backend data when developing the UI |
-| overlay.warnings | `false`                                                           |                                                                                                                                                                                                                                                                                     In case of an warning, do not show an overlay |
-| overlay.errors   | `true`                                                            |                                                                                                                                                                                                                                                                       In case of an error, show an overlay over the UI showing it |
-| host             | `localhost`                                                       |                                                                                                                                                                                                                              The hostname to use for the server. Can be overridden using the `DEV_HOSTNAME` environment variable. |
-| port             | `8080`                                                            |                                                                                                                                                                                                                                      The port to use for the server. Can be overridden using the `DEV_PORT` environment variable. |
+| Option           | Value                                                             |                                                                                                                                                                                                                                                                                                                                                                                                   Reason |
+| ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| contentBase      | [`dist` (via constant), `generated/bundle-analyser/bundles.html`] |                                                                        Source for static files. This is the built output directory, where static files will land as a part of the first build during dev start up. In addition, include the output of `webpack-bundle-analyzer`, so a developer can access a `/bundles.html` file through `webpack-dev-server`, showing current bundle size/distribution |
+| watchContentBase | `true`                                                            |                                                                                                                                                                                                                                                                                                                                                                          Reload if a static file changes |
+| compress         | `true`                                                            |                                                                                                                                                                                                                                                                                                                          Serve all content via .gz files - makes rebuilds/hot changes faster to retrieve |
+| inline           | `true`                                                            |                                                                                                                                                                                                                                                                                                                                   Enforce default setting, recommended when using `hot` reloading option |
+| hot              | `true`                                                            |                                                                                                                                                                                                                                                                                                                                                       Enables hot reloading of content when files change |
+| https            | `false`                                                           |                                                                                                                                                                                                                                                            Runs `webpack-dev-server` via an HTTPS server. Will be enabled automatically in certificates generated by `npm run addDevCerts` are detected. |
+| proxy            | ~ \* => http(s);//localhost:3000                                  | Used to proxy requests for backend data when developing the UI. Any request not handled by the dev server will be proxied. This first goes to localhost 3000, which is a development instance of the UI server. This in turn proxies data to the mock admin server, as per the production topology. This will automatically TLS secured if certificates generated by `npm run addDevCerts` are detected. |
+| overlay.warnings | `false`                                                           |                                                                                                                                                                                                                                                                                                                                                            In case of an warning, do not show an overlay |
+| overlay.errors   | `true`                                                            |                                                                                                                                                                                                                                                                                                                                              In case of an error, show an overlay over the UI showing it |
+| host             | `localhost`                                                       |                                                                                                                                                                                                                                                                                                     The hostname to use for the server. Can be overridden using the `WDS_HOSTNAME` environment variable. |
+| port             | `8080`                                                            |                                                                                                                                                                                                                                                                                                             The port to use for the server. Can be overridden using the `WDS_PORT` environment variable. |
 
-By default, `webpack-dev-server` will host the UI at `https://localhost:8080/`. Both the hostname and port can be overridden/changed via the `DEV_HOSTNAME` and `DEV_PORT` environment variables respectively.
+By default, `webpack-dev-server` will host the UI at `https://localhost:8080/`. Both the hostname and port can be overridden/changed via the `WDS_HOSTNAME` and `WDS_PORT` environment variables respectively.
+
+### Module resolution
+
+The UI makes extensive use of Typescript's [module resolution](https://www.typescriptlang.org/docs/handbook/module-resolution.html) features. This makes importing code far cleaner and easier. For example, a traditional import of a module in another directory:
+
+````
+- Modules
+  - MyModule
+    - index.ts
+- App
+  - Page
+    - index.ts
+
+```ts
+import { myFunction } from '../../Modules/MyModule';
+````
+
+with the following typescript configuration:
+
+```json
+{
+  "baseUrl": "."
+}
+```
+
+can be referenced as:
+
+```ts
+import { myFunction } from 'Modules/MyModule';
+```
+
+Typescript will resolve the relative path against the base url.
+
+Additionally, custom paths can be configured to act like top level modules:
+
+````
+- utils
+  - test
+    - index.ts
+- App
+  - Page
+    - index.ts
+
+```ts
+import { myFunction } from '../../Modules/MyModule';
+````
+
+with the following typescript configuration:
+
+```json
+{
+    "baseUrl": ".",
+    "paths: {
+        "test-utils": ["utils/test/index.ts"] //Relative to "baseUrl"
+    }
+}
+```
+
+can be referenced as:
+
+```ts
+import { testFunction } from 'test-utils';
+```
 
 ### UI Build implementation
 
@@ -201,6 +232,6 @@ The UI build is used in a `dockerfile` to produce an image that can then be depl
 - Run `npm run build`, which in turn runs a production build of the client and server
 - Clear installed dependencies, and install just production (shipped) dependencies
 - Move the built UI directory `dist` and `node_modules` to the required location
-- Sets the entrypoint to a script/command which runs the UI Server: `node dist/server/main.bundle.js`
+- Sets the entrypoint to a script/command which runs the UI Server: `node dist/server/main.js`
 
 Further details to be added once https://github.com/strimzi/proposals/pull/6 has been finalized.
